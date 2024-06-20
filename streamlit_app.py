@@ -1,40 +1,63 @@
-import altair as alt
-import numpy as np
 import pandas as pd
+import plotly.express as px
 import streamlit as st
+import dash
+from dash import html, dcc
+from dash.dependencies import Input, Output
 
-"""
-# Welcome to Streamlit!
+# Load data
+url = "https://raw.githubusercontent.com/plotly/datasets/master/diabetes-vid.csv"
+df = pd.read_csv(url)
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:.
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
+# Streamlit app
+st.set_page_config(page_title="Diabetes Dashboard", page_icon=":bar_chart:")
+st.title("Diabetes Dashboard")
 
-In the meantime, below is an example of what you can do with just a few lines of code:
-"""
+# Create scatter plot using Plotly Express
+fig = px.scatter(df, x="BloodPressure", y="BMI", color="Age", title="Blood Pressure vs BMI colored by Age")
 
-num_points = st.slider("Number of points in spiral", 1, 10000, 1100)
-num_turns = st.slider("Number of turns in spiral", 1, 300, 31)
+# Create Dash app
+app = dash.Dash(__name__, prevent_initial_callbacks=True)
 
-indices = np.linspace(0, 1, num_points)
-theta = 2 * np.pi * num_turns * indices
-radius = indices
+# Create dropdown options
+outcome_options = [{"label": o, "value": o} for o in df["Outcome"].unique()]
 
-x = radius * np.cos(theta)
-y = radius * np.sin(theta)
+# Create Dash component
+app.layout = html.Div(
+    [
+        html.H1("Diabetes Data"),
+        html.Div(
+            [
+                dcc.Dropdown(
+                    id="outcome-filter",
+                    options=outcome_options,
+                    value=df["Outcome"].unique()[0],
+                )
+            ]
+        ),
+        dcc.Graph(id="scatter-plot", figure=fig),
+    ]
+)
 
-df = pd.DataFrame({
-    "x": x,
-    "y": y,
-    "idx": indices,
-    "rand": np.random.randn(num_points),
-})
+# Callback function to update the scatter plot based on the selected 'Outcome' value
+@app.callback(
+    Output("scatter-plot", "figure"),
+    [Input("outcome-filter", "value")],
+)
+def update_scatter_plot(selected_outcome):
+    filtered_df = df[df["Outcome"] == selected_outcome]
+    fig = px.scatter(
+        filtered_df, x="BloodPressure", y="BMI", color="Age", title="Blood Pressure vs BMI colored by Age"
+    )
+    return fig
 
-st.altair_chart(alt.Chart(df, height=700, width=700)
-    .mark_point(filled=True)
-    .encode(
-        x=alt.X("x", axis=None),
-        y=alt.Y("y", axis=None),
-        color=alt.Color("idx", legend=None, scale=alt.Scale()),
-        size=alt.Size("rand", legend=None, scale=alt.Scale(range=[1, 150])),
-    ))
+# Display app
+st.plotly_chart(fig)
+st.components.v1.html(app.index_string, height=800)
+
+if __name__ == "__main__":
+    st.sidebar.header("Filter data")
+    app.run_server(debug=True, port=8050)
+
+st.markdown("***")
+st.write("Dashboard developed by Amazon Q")
